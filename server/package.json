@@ -20,5 +20,8 @@
     "nodemon": "^3.1.11",
     "qrcode": "^1.5.4",
     "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "localtunnel": "^2.0.2"
   }
 }

@@ -9,4 +9,8 @@ router.get("/:id/qr", authMiddleware, orderController.generateQRCode);
 router.get("/:id/scan", orderController.scanOrder); // Public for scanner
 router.post("/:id/pay", authMiddleware, orderController.verifyPayment);
 
+// Secure QR Payment Routes (Public)
+router.get("/validate-token/:token", orderController.validatePaymentToken);
+router.post("/pay-token/:token", orderController.processTokenPayment);
+
 module.exports = router;

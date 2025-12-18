@@ -66,6 +66,8 @@ exports.getMyOrders = async (req, res) => {
 
 const QRCode = require("qrcode");
 
+const crypto = require("crypto");
+
 exports.generateQRCode = async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
@@ -77,8 +79,17 @@ exports.generateQRCode = async (req, res) => {
             return res.status(403).json({ message: "Not authorized" });
         }
 
-        // Encode a URL that the scanner can visit
-        const scanUrl = `http://localhost:3000/api/orders/${order._id}/scan`;
+        // Generate a secure random token
+        const token = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        order.paymentToken = token;
+        order.paymentTokenExpiresAt = expiresAt;
+        await order.save();
+
+        // URL points to the CLIENT payment page with the token
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+        const scanUrl = `${clientUrl}/pay/${token}`;
 
         const qrCodeUrl = await QRCode.toDataURL(scanUrl);
         res.json({ qrCodeUrl, scanUrl });
@@ -118,6 +129,55 @@ exports.verifyPayment = async (req, res) => {
         }
 
         order.status = "paid";
+        await order.save();
+
+        res.json({ message: "Payment successful", order });
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+exports.validatePaymentToken = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const order = await Order.findOne({
+            paymentToken: token,
+            paymentTokenExpiresAt: { $gt: Date.now() }
+        }).select("totalAmount status");
+
+        if (!order) {
+            return res.status(400).json({ message: "Invalid or expired payment link" });
+        }
+
+        if (order.status === 'paid') {
+            return res.status(400).json({ message: "Order already paid" });
+        }
+
+        res.json({
+            orderId: order._id,
+            amount: order.totalAmount,
+            status: order.status
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+exports.processTokenPayment = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const order = await Order.findOne({
+            paymentToken: token,
+            paymentTokenExpiresAt: { $gt: Date.now() }
+        });
+
+        if (!order) {
+            return res.status(400).json({ message: "Invalid or expired payment link" });
+        }
+
+        order.status = "paid";
+        order.paymentToken = undefined; // Clear token after use
+        order.paymentTokenExpiresAt = undefined;
         await order.save();
 
         res.json({ message: "Payment successful", order });
