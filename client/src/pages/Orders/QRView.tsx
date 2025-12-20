@@ -36,7 +36,7 @@ const QRView = () => {
             // Optimization: Let's just use the scan endpoint which returns status!
             const res = await api.get(`/orders/${id}/scan`);
             if (res.data.status === "paid") {
-                navigate("/orders"); // Redirect to orders list
+                navigate("/order-success"); // Redirect to order success page
             }
         } catch (err) {
             // Ignore errors during polling

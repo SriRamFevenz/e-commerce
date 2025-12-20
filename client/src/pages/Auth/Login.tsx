@@ -3,7 +3,8 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import Notification from "../../components/Notification";
-import GoBackButton from "../../components/GoBackButton";
+
+import Loading from "../../components/Loading";
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -12,22 +13,28 @@ const Login = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
     const message = location.state?.message;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setLoading(true);
         try {
-            const res = await api.post("/auth/login", { email, password });
-            await login(res.data.token);
+            await api.post("/auth/login", { email, password });
+            await login();
             navigate("/");
         } catch (err: any) {
             setError(err.response?.data?.message || "Login failed");
+            setLoading(false);
         }
     };
 
+    if (loading) {
+        return <Loading />;
+    }
+
     return (
         <div className="auth-container">
-            <GoBackButton />
             <h2>Login</h2>
             <Notification message={message} type="success" />
             <Notification message={error} type="error" />

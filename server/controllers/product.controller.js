@@ -32,7 +32,8 @@ exports.getAllProducts = async (req, res) => {
             query = {
                 $or: [
                     { title: { $regex: search, $options: "i" } },
-                    { description: { $regex: search, $options: "i" } }
+                    { description: { $regex: search, $options: "i" } },
+                    { tags: { $regex: search, $options: "i" } }
                 ]
             };
         }

@@ -55,9 +55,52 @@ exports.login = async (req, res) => {
     }
 
     const token = generateToken({ id: user._id, role: user.role });
+    const { logger, authLogger } = require("../utils/logger");
+
+    // Log all logins
+    authLogger.info({
+      message: 'User Login',
+      userId: user._id,
+      email: user.email,
+      role: user.role,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date().toISOString()
+    });
+
+    if (user.role === 'admin') {
+      // Check for Office IP restriction
+      if (process.env.OFFICE_IP && process.env.OFFICE_IP !== req.ip) {
+        logger.warn({
+          message: 'Admin Login Blocked - Invalid IP',
+          userId: user._id,
+          email: user.email,
+          ip: req.ip,
+          expectedIp: process.env.OFFICE_IP,
+          userAgent: req.headers['user-agent'],
+          timestamp: new Date().toISOString()
+        });
+        return res.status(403).json({ message: "Access denied: Invalid IP address" });
+      }
+
+      logger.info({
+        message: 'Admin Login',
+        userId: user._id,
+        email: user.email,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
 
     res.json({
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -71,4 +114,9 @@ exports.login = async (req, res) => {
     }
     res.status(500).json({ message: "Internal server error" });
   }
+};
+
+exports.logout = (req, res) => {
+  res.clearCookie('token');
+  res.json({ message: "Logged out successfully" });
 };

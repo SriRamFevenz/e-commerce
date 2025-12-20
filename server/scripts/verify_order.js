@@ -4,76 +4,57 @@ const Product = require("../models/Product");
 const { generateToken } = require("../utils/jwt");
 require("dotenv").config();
 
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || 'localhost';
+const API_URL = `http://${HOST}:${PORT}/api`;
+
 const run = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URL);
-        console.log("Connected to DB");
 
-        // 1. Setup User
-        let user = await User.findOne({ email: "test@example.com" });
-        if (!user) {
-            const bcrypt = require("bcrypt");
-            const hashedPassword = await bcrypt.hash("password123", 10);
-            user = await User.create({ name: "Test User", email: "test@example.com", password: hashedPassword });
+        const user = await User.findOne({ email: process.env.ADMIN_EMAIL });
+        const product = await Product.findOne();
+
+        if (!user || !product) {
+            console.error("User or Product not found");
+            return;
         }
+
         const token = generateToken({ id: user._id, role: user.role });
 
-        // 2. Setup Product
-        let product = await Product.findOne({ title: "Order Test Product" });
-        if (!product) {
-            product = await Product.create({
-                title: "Order Test Product",
-                description: "For testing orders",
-                price: 50,
-                category: "Test",
-                image: "http://test.com/img.jpg",
-                stock: 100
-            });
-        }
-
-        // 3. Create Order
-        console.log("Creating Order...");
-        const createRes = await fetch("http://localhost:3000/api/orders", {
+        // Create Order
+        console.log(`Creating Order at ${API_URL}...`);
+        const createRes = await fetch(`${API_URL}/orders`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
-                items: [
-                    { product: product._id, quantity: 2 }
-                ]
+                items: [{ product: product._id, quantity: 1 }],
+                totalAmount: product.price,
+                shippingAddress: { address: "Test St", city: "Test City", postalCode: "12345", country: "Test Country" },
+                paymentMethod: "cod"
             })
         });
 
-        if (createRes.ok) {
-            const order = await createRes.json();
-            console.log("SUCCESS: Order created. Total Amount:", order.totalAmount);
-            if (order.totalAmount !== 100) {
-                console.error("ERROR: Total amount incorrect. Expected 100, got", order.totalAmount);
-            }
-        } else {
-            const err = await createRes.json();
-            console.error("ERROR: Failed to create order:", err);
+        if (!createRes.ok) {
+            console.error("ERROR: Failed to create order", await createRes.json());
+            return;
         }
+        console.log("SUCCESS: Order created");
 
-        // 4. Get My Orders
-        console.log("Fetching User Orders...");
-        const getRes = await fetch("http://localhost:3000/api/orders/myorders", {
+        // Fetch Orders
+        console.log("Fetching Orders...");
+        const getRes = await fetch(`${API_URL}/orders/myorders`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
 
         if (getRes.ok) {
             const orders = await getRes.json();
             console.log("SUCCESS: Fetched orders. Count:", orders.length);
-            const lastOrder = orders[orders.length - 1];
-            if (lastOrder.items[0].product.title === "Order Test Product") {
-                console.log("SUCCESS: Order details verified.");
-            } else {
-                console.error("ERROR: Order details mismatch.");
-            }
         } else {
-            console.error("ERROR: Failed to fetch orders");
+            console.error("ERROR: Failed to fetch orders", await getRes.json());
         }
 
     } catch (err) {

@@ -1,12 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
-interface CartItem {
-    id: string;
-    title: string;
-    price: number;
-    image: string;
-    quantity: number;
-}
+import type { CartItem } from "../types";
 
 interface CartContextType {
     items: CartItem[];
@@ -42,6 +36,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         setItems((prev) => {
             const existing = prev.find((item) => item.id === product._id);
             if (existing) {
+                if (existing.quantity >= product.stock) {
+                    // alert("Cannot add more items than available in stock");
+                    return prev;
+                }
                 return prev.map((item) =>
                     item.id === product._id
                         ? { ...item, quantity: item.quantity + 1 }
@@ -56,6 +54,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                     price: product.price,
                     image: product.image,
                     quantity: 1,
+                    stock: product.stock,
                 },
             ];
         });
@@ -71,6 +70,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
             prev.map((item) => {
                 if (item.id === id) {
                     const newQuantity = item.quantity + delta;
+                    if (newQuantity > item.stock) {
+                        // alert("Cannot add more items than available in stock");
+                        return item;
+                    }
                     return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
                 }
                 return item;

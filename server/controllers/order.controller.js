@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const { z } = require("zod");
+const { paymentLogger } = require("../utils/logger");
 
 const orderItemSchema = z.object({
     product: z.string(),
@@ -35,9 +36,9 @@ exports.createOrder = async (req, res) => {
 
             totalAmount += product.price * item.quantity;
 
-            // Optional: Decrease stock
-            // product.stock -= item.quantity;
-            // await product.save();
+            // Decrease stock
+            product.stock -= item.quantity;
+            await product.save();
         }
 
         const order = await Order.create({
@@ -131,6 +132,15 @@ exports.verifyPayment = async (req, res) => {
         order.status = "paid";
         await order.save();
 
+        paymentLogger.info({
+            message: 'Payment Successful',
+            orderId: order._id,
+            amount: order.totalAmount,
+            userId: order.user,
+            method: 'manual_verify',
+            timestamp: new Date().toISOString()
+        });
+
         res.json({ message: "Payment successful", order });
     } catch (error) {
         res.status(500).json({ message: "Internal server error" });
@@ -179,6 +189,15 @@ exports.processTokenPayment = async (req, res) => {
         order.paymentToken = undefined; // Clear token after use
         order.paymentTokenExpiresAt = undefined;
         await order.save();
+
+        paymentLogger.info({
+            message: 'Payment Successful',
+            orderId: order._id,
+            amount: order.totalAmount,
+            userId: order.user,
+            method: 'token_payment',
+            timestamp: new Date().toISOString()
+        });
 
         res.json({ message: "Payment successful", order });
     } catch (error) {

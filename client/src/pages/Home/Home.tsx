@@ -3,18 +3,16 @@ import api from "../../services/api";
 import { Link, useLocation } from "react-router-dom";
 import Notification from "../../components/Notification";
 import Hero from "../../components/Hero";
+import Loading from "../../components/Loading";
 
-interface Product {
-    _id: string;
-    title: string;
-    price: number;
-    image: string;
-}
+import type { Product } from "../../types";
 
 const Home = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [error, setError] = useState("");
     const location = useLocation();
+
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const searchParams = new URLSearchParams(location.search);
@@ -23,14 +21,19 @@ const Home = () => {
     }, [location.search]);
 
     const fetchProducts = async (search?: string | null) => {
+        setLoading(true);
         try {
             const url = search ? `/products?search=${encodeURIComponent(search)}` : "/products";
             const res = await api.get(url);
             setProducts(res.data);
         } catch (err) {
             setError("Failed to fetch products");
+        } finally {
+            setLoading(false);
         }
     };
+
+    if (loading) return <Loading />;
 
     return (
         <div>

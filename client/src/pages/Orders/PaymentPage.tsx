@@ -4,8 +4,12 @@ import api from "../../services/api";
 import Notification from "../../components/Notification";
 import { ShieldCheck, CreditCard, CheckCircle } from "lucide-react";
 import GoBackButton from "../../components/GoBackButton";
+import useDocumentTitle from "../../hooks/useDocumentTitle";
+
+import Loading from "../../components/Loading";
 
 const PaymentPage = () => {
+    useDocumentTitle("Payment");
     const { token } = useParams();
     const [order, setOrder] = useState<{ amount: number; status: string } | null>(null);
     const [error, setError] = useState("");
@@ -38,23 +42,7 @@ const PaymentPage = () => {
     };
 
     if (loading) {
-        return (
-            <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div className="spinner" style={{
-                        width: '40px',
-                        height: '40px',
-                        border: '3px solid #f3f3f3',
-                        borderTop: '3px solid #000',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite',
-                        margin: '0 auto 1rem'
-                    }} />
-                    <p>Verifying secure link...</p>
-                </div>
-                <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-            </div>
-        );
+        return <Loading />;
     }
 
     if (error && !success) {
@@ -73,23 +61,24 @@ const PaymentPage = () => {
     }
 
     return (
-        <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', background: '#f9f9f9', flexDirection: 'column' }}>
+        <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', background: 'var(--bg-secondary)', flexDirection: 'column' }}>
             <div style={{ width: '100%', maxWidth: '450px', marginBottom: '1rem' }}>
                 <GoBackButton />
             </div>
             <div style={{
-                background: 'white',
+                background: 'var(--bg-primary)',
                 padding: '3rem',
                 borderRadius: '16px',
                 boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
                 width: '100%',
                 maxWidth: '450px',
-                textAlign: 'center'
+                textAlign: 'center',
+                border: '1px solid var(--border-color)'
             }}>
                 <div style={{ marginBottom: '2rem' }}>
                     <div style={{
-                        background: '#000',
-                        color: 'white',
+                        background: 'var(--primary)',
+                        color: 'var(--bg-primary)',
                         width: '60px',
                         height: '60px',
                         borderRadius: '50%',
@@ -100,10 +89,10 @@ const PaymentPage = () => {
                     }}>
                         {success ? <CheckCircle size={32} /> : <CreditCard size={32} />}
                     </div>
-                    <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem' }}>
+                    <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
                         {success ? 'Payment Complete' : 'Secure Checkout'}
                     </h1>
-                    <p style={{ color: '#666', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                         <ShieldCheck size={14} /> Encrypted & Secure
                     </p>
                 </div>
@@ -112,9 +101,9 @@ const PaymentPage = () => {
 
                 {order && (
                     <div>
-                        <div style={{ margin: '2.5rem 0', padding: '1.5rem', background: '#f5f5f5', borderRadius: '12px' }}>
-                            <p style={{ margin: '0 0 0.5rem', color: '#666', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Amount</p>
-                            <p className="price" style={{ fontSize: '3rem', margin: 0, fontWeight: '800', color: '#000' }}>
+                        <div style={{ margin: '2.5rem 0', padding: '1.5rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                            <p style={{ margin: '0 0 0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Amount</p>
+                            <p className="price" style={{ fontSize: '3rem', margin: 0, fontWeight: '800', color: 'var(--text-primary)' }}>
                                 ${order.amount.toFixed(2)}
                             </p>
                         </div>
@@ -122,13 +111,13 @@ const PaymentPage = () => {
                         {!success && (
                             <>
                                 <div style={{ marginBottom: '2rem', textAlign: 'left' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#666' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                                         <span>Order Status</span>
-                                        <span style={{ fontWeight: '600', color: '#000', textTransform: 'capitalize' }}>{order.status}</span>
+                                        <span style={{ fontWeight: '600', color: 'var(--text-primary)', textTransform: 'capitalize' }}>{order.status}</span>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
                                         <span>Payment Method</span>
-                                        <span style={{ fontWeight: '600', color: '#000' }}>Secure QR Link</span>
+                                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Secure QR Link</span>
                                     </div>
                                 </div>
 
@@ -140,8 +129,8 @@ const PaymentPage = () => {
                                         padding: '1rem',
                                         fontSize: '1.1rem',
                                         borderRadius: '8px',
-                                        background: '#000',
-                                        color: 'white',
+                                        background: 'var(--primary)',
+                                        color: 'var(--bg-primary)',
                                         border: 'none',
                                         cursor: 'pointer',
                                         transition: 'transform 0.2s'

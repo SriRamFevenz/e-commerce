@@ -2,28 +2,32 @@ import { useEffect, useState } from "react";
 import api from "../../services/api";
 import Notification from "../../components/Notification";
 import GoBackButton from "../../components/GoBackButton";
+import ConfirmationModal from "../../components/ConfirmationModal";
+import useDocumentTitle from "../../hooks/useDocumentTitle";
+
 import { useAuth } from "../../context/AuthContext";
-import { LogOut, User, Shield, Trash2 } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
+import { LogOut, User as UserIcon, Shield, Trash2, Moon, Sun, Palette } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-interface UserProfile {
-    name: string;
-    email: string;
-    role: string;
-    ordersCount?: number;
-    totalSpent?: number;
-}
+import type { User } from "../../types";
+import Loading from "../../components/Loading";
 
 const Settings = () => {
-    const { logout } = useAuth();
+    useDocumentTitle("Settings");
+    const { user, logout, updateUser } = useAuth();
+    const { theme, setTheme } = useTheme();
     const navigate = useNavigate();
-    const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [profile, setProfile] = useState<User | null>(null);
     const [activeTab, setActiveTab] = useState('profile');
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
     // Profile Edit State
     const [newName, setNewName] = useState("");
+    const [newMobile, setNewMobile] = useState("");
+    const [newBio, setNewBio] = useState("");
+    const [newAddress, setNewAddress] = useState("");
 
     // Password State
     const [oldPassword, setOldPassword] = useState("");
@@ -37,6 +41,13 @@ const Settings = () => {
     const [userConfirmationInput, setUserConfirmationInput] = useState("");
     const [deleteError, setDeleteError] = useState("");
 
+    // Modal States
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [showProfileConfirm, setShowProfileConfirm] = useState(false);
+    const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+    const [showDeletePicConfirm, setShowDeletePicConfirm] = useState(false);
+
+
     useEffect(() => {
         fetchProfile();
         generateConfirmationText();
@@ -47,6 +58,9 @@ const Settings = () => {
             const res = await api.get("/users/profile");
             setProfile(res.data);
             setNewName(res.data.name);
+            setNewMobile(res.data.mobile || "");
+            setNewBio(res.data.bio || "");
+            setNewAddress(res.data.address || "");
         } catch (err) {
             setError("Failed to fetch profile");
         }
@@ -61,7 +75,12 @@ const Settings = () => {
 
     const handleUpdateProfile = async () => {
         try {
-            const res = await api.put("/users/profile", { name: newName });
+            const res = await api.put("/users/profile", {
+                name: newName,
+                mobile: newMobile,
+                bio: newBio,
+                address: newAddress
+            });
             setProfile(res.data.user);
             setSuccess("Profile updated successfully");
             setTimeout(() => setSuccess(""), 3000);
@@ -70,8 +89,8 @@ const Settings = () => {
         }
     };
 
-    const handleUpdatePassword = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleUpdatePassword = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         if (newPassword !== confirmPassword) {
             setPasswordError("New passwords do not match");
             return;
@@ -103,12 +122,9 @@ const Settings = () => {
         }
     };
 
-    if (!profile && !error) return (
-        <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-            <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid #f3f3f3', borderTop: '3px solid #000', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-        </div>
-    );
+
+
+    if (!profile && !error) return <Loading />;
 
     const renderContent = () => {
         switch (activeTab) {
@@ -117,16 +133,63 @@ const Settings = () => {
                     <div className="profile-section">
                         <div className="settings-header">
                             <h2>Public Profile</h2>
-                            <p style={{ color: '#6b7280' }}>Manage your personal information</p>
+                            <p style={{ color: 'var(--text-secondary)' }}>Manage your personal information</p>
                         </div>
 
                         <div className="avatar-section">
-                            <div className="avatar-large">
-                                {profile?.name.charAt(0).toUpperCase()}
+                            <div className="avatar-large" style={{
+                                backgroundImage: profile?.profilePicture ? `url(${profile.profilePicture})` : 'none',
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: profile?.profilePicture ? 'transparent' : undefined
+                            }}>
+                                {!profile?.profilePicture && profile?.name.charAt(0).toUpperCase()}
                             </div>
                             <div style={{ display: 'flex', gap: '1rem' }}>
-                                <button className="btn-black">Change Photo</button>
-                                <button className="btn-outline">Delete</button>
+                                <input
+                                    type="file"
+                                    id="avatar-upload"
+                                    style={{ display: 'none' }}
+                                    accept="image/*"
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+
+                                        const formData = new FormData();
+                                        formData.append('image', file);
+
+                                        try {
+                                            const res = await api.post("/users/profile/picture", formData, {
+                                                headers: { 'Content-Type': 'multipart/form-data' }
+                                            });
+                                            const updatedProfile = { ...profile!, profilePicture: res.data.profilePicture };
+                                            setProfile(updatedProfile);
+                                            if (user) {
+                                                updateUser({ ...user, profilePicture: res.data.profilePicture });
+                                            }
+                                            setSuccess("Profile picture updated");
+                                            setTimeout(() => setSuccess(""), 3000);
+                                        } catch (err) {
+                                            setError("Failed to upload image");
+                                        }
+                                    }}
+                                />
+                                <button className="btn-black" onClick={() => document.getElementById('avatar-upload')?.click()}>
+                                    Change Photo
+                                </button>
+                                <button
+                                    className="btn-outline"
+                                    onClick={() => {
+                                        if (profile?.profilePicture) {
+                                            setShowDeletePicConfirm(true);
+                                        }
+                                    }}
+                                >
+                                    Delete
+                                </button>
                             </div>
                         </div>
 
@@ -148,9 +211,31 @@ const Settings = () => {
                                 value={profile?.email}
                                 disabled
                             />
-                            <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                                 Email address cannot be changed.
                             </p>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Mobile Number</label>
+                            <input
+                                type="tel"
+                                className="form-input"
+                                value={newMobile}
+                                onChange={(e) => setNewMobile(e.target.value)}
+                                placeholder="+1 (555) 000-0000"
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Address</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={newAddress}
+                                onChange={(e) => setNewAddress(e.target.value)}
+                                placeholder="123 Main St, City, Country"
+                            />
                         </div>
 
                         <div className="form-group">
@@ -158,12 +243,14 @@ const Settings = () => {
                             <textarea
                                 className="form-input"
                                 rows={4}
+                                value={newBio}
+                                onChange={(e) => setNewBio(e.target.value)}
                                 placeholder="Tell us about yourself..."
                                 style={{ resize: 'none' }}
                             ></textarea>
                         </div>
 
-                        <button className="btn-black" onClick={handleUpdateProfile}>Save Changes</button>
+                        <button className="btn-black" onClick={() => setShowProfileConfirm(true)}>Save Changes</button>
                     </div>
                 );
             case 'security':
@@ -171,10 +258,10 @@ const Settings = () => {
                     <div className="profile-section">
                         <div className="settings-header">
                             <h2>Security</h2>
-                            <p style={{ color: '#6b7280' }}>Manage your password and account security</p>
+                            <p style={{ color: 'var(--text-secondary)' }}>Manage your password and account security</p>
                         </div>
 
-                        <form onSubmit={handleUpdatePassword}>
+                        <form onSubmit={(e) => { e.preventDefault(); setShowPasswordConfirm(true); }}>
                             <div className="form-group">
                                 <label className="form-label">Current Password</label>
                                 <input
@@ -210,6 +297,63 @@ const Settings = () => {
                         </form>
                     </div>
                 );
+            case 'appearance':
+                return (
+                    <div className="profile-section">
+                        <div className="settings-header">
+                            <h2>Appearance</h2>
+                            <p style={{ color: 'var(--text-secondary)' }}>Customize the look and feel of the application</p>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Theme</label>
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                <button
+                                    className={`btn-outline ${theme === 'light' ? 'active-theme' : ''}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        borderColor: theme === 'light' ? 'var(--text-primary)' : 'var(--border-color)',
+                                        background: theme === 'light' ? 'var(--bg-secondary)' : 'transparent',
+                                        color: 'var(--text-primary)'
+                                    }}
+                                    onClick={() => setTheme('light')}
+                                >
+                                    <Sun size={18} /> Light
+                                </button>
+                                <button
+                                    className={`btn-outline ${theme === 'dark' ? 'active-theme' : ''}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        borderColor: theme === 'dark' ? 'var(--text-primary)' : 'var(--border-color)',
+                                        background: theme === 'dark' ? 'var(--bg-secondary)' : 'transparent',
+                                        color: 'var(--text-primary)'
+                                    }}
+                                    onClick={() => setTheme('dark')}
+                                >
+                                    <Moon size={18} /> Dark
+                                </button>
+                                <button
+                                    className={`btn-outline ${theme === 'system' ? 'active-theme' : ''}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        borderColor: theme === 'system' ? 'var(--text-primary)' : 'var(--border-color)',
+                                        background: theme === 'system' ? 'var(--bg-secondary)' : 'transparent',
+                                        color: 'var(--text-primary)'
+                                    }}
+                                    onClick={() => setTheme('system')}
+                                >
+                                    <Palette size={18} /> System
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
             case 'delete':
                 return (
                     <div className="profile-section">
@@ -217,16 +361,16 @@ const Settings = () => {
                             <h2 style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <Trash2 size={24} /> Delete Account
                             </h2>
-                            <p style={{ color: '#6b7280' }}>Permanently delete your account and all associated data</p>
+                            <p style={{ color: 'var(--text-secondary)' }}>Permanently delete your account and all associated data</p>
                         </div>
 
                         <div className="danger-zone" style={{ marginTop: '2rem', paddingTop: 0, borderTop: 'none' }}>
-                            <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '8px', padding: '1.5rem', marginBottom: '2rem' }}>
+                            <div style={{ background: 'rgba(220, 38, 38, 0.1)', border: '1px solid rgba(220, 38, 38, 0.2)', borderRadius: '8px', padding: '1.5rem', marginBottom: '2rem' }}>
                                 <h3 style={{ color: '#dc2626', fontWeight: '600', marginBottom: '1rem' }}>⚠️ Warning</h3>
-                                <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
                                     Once you delete your account, there is no going back. This action will:
                                 </p>
-                                <ul style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                                <ul style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
                                     <li>Permanently delete your profile and personal information</li>
                                     <li>Remove all your order history</li>
                                     <li>Cancel any pending orders</li>
@@ -234,72 +378,25 @@ const Settings = () => {
                                 </ul>
                             </div>
 
-                            {!showDeleteConfirm ? (
-                                <button
-                                    className="btn-outline"
-                                    style={{ borderColor: '#fee2e2', color: '#dc2626', background: '#fef2f2', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                                    onClick={() => {
-                                        setShowDeleteConfirm(true);
-                                        generateConfirmationText();
-                                        setUserConfirmationInput("");
-                                        setDeleteError("");
-                                    }}
-                                >
-                                    <Trash2 size={18} />
-                                    Delete My Account
-                                </button>
-                            ) : (
-                                <div style={{ background: '#fff', padding: '1.5rem', border: '2px solid #fee2e2', borderRadius: '8px' }}>
-                                    <p style={{ fontWeight: '600', color: '#dc2626', marginBottom: '1rem', fontSize: '1.1rem' }}>
-                                        Are you absolutely sure?
-                                    </p>
-                                    <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
-                                        To confirm, please type <strong style={{ color: '#dc2626', fontSize: '1.1rem', fontFamily: 'monospace' }}>{confirmationText}</strong> in the box below:
-                                    </p>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder={`Type ${confirmationText} to confirm`}
-                                        value={userConfirmationInput}
-                                        onChange={(e) => {
-                                            setUserConfirmationInput(e.target.value);
-                                            setDeleteError("");
-                                        }}
-                                        style={{ marginBottom: '1rem', fontFamily: 'monospace', fontSize: '1rem' }}
-                                    />
-                                    {deleteError && (
-                                        <p style={{ color: '#dc2626', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                                            {deleteError}
-                                        </p>
-                                    )}
-                                    <div style={{ display: 'flex', gap: '1rem' }}>
-                                        <button
-                                            className="btn-black"
-                                            style={{ background: '#dc2626' }}
-                                            onClick={handleDeleteAccount}
-                                            disabled={userConfirmationInput !== confirmationText}
-                                        >
-                                            Yes, Delete My Account
-                                        </button>
-                                        <button
-                                            className="btn-outline"
-                                            onClick={() => {
-                                                setShowDeleteConfirm(false);
-                                                setUserConfirmationInput("");
-                                                setDeleteError("");
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <button
+                                className="btn-outline"
+                                style={{ borderColor: '#dc2626', color: '#dc2626', background: 'transparent', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                onClick={() => {
+                                    setShowDeleteConfirm(true);
+                                    generateConfirmationText();
+                                    setUserConfirmationInput("");
+                                    setDeleteError("");
+                                }}
+                            >
+                                <Trash2 size={18} />
+                                Delete My Account
+                            </button>
                         </div>
                     </div>
                 );
             default:
                 return (
-                    <div style={{ textAlign: 'center', padding: '4rem', color: '#6b7280' }}>
+                    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
                         <p>This section is coming soon.</p>
                     </div>
                 );
@@ -307,8 +404,8 @@ const Settings = () => {
     };
 
     return (
-        <div style={{ background: '#f9fafb', minHeight: '100vh' }}>
-            <div style={{ padding: '1rem 2rem', borderBottom: '1px solid #e5e7eb', background: '#fff' }}>
+        <div style={{ background: 'var(--bg-secondary)', minHeight: '100vh', color: 'var(--text-primary)' }}>
+            <div style={{ padding: '1rem 2rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-primary)' }}>
                 <GoBackButton style={{ marginBottom: 0 }} />
             </div>
 
@@ -323,13 +420,19 @@ const Settings = () => {
                             className={`sidebar-item ${activeTab === 'profile' ? 'active' : ''}`}
                             onClick={() => setActiveTab('profile')}
                         >
-                            <User size={20} /> Profile
+                            <UserIcon size={20} /> Profile
                         </div>
                         <div
                             className={`sidebar-item ${activeTab === 'security' ? 'active' : ''}`}
                             onClick={() => setActiveTab('security')}
                         >
                             <Shield size={20} /> Security
+                        </div>
+                        <div
+                            className={`sidebar-item ${activeTab === 'appearance' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('appearance')}
+                        >
+                            <Palette size={20} /> Appearance
                         </div>
                         <div
                             className={`sidebar-item ${activeTab === 'delete' ? 'active' : ''}`}
@@ -342,8 +445,8 @@ const Settings = () => {
 
                     <button
                         className="sidebar-item"
-                        style={{ marginTop: 'auto', color: '#dc2626', width: '100%', border: '1px solid #e5e7eb', justifyContent: 'center' }}
-                        onClick={logout}
+                        style={{ marginTop: 'auto', color: '#dc2626', width: '100%', border: '1px solid var(--border-color)', justifyContent: 'center' }}
+                        onClick={() => setShowLogoutConfirm(true)}
                     >
                         <LogOut size={20} /> Sign Out
                     </button>
@@ -355,6 +458,107 @@ const Settings = () => {
                     {renderContent()}
                 </div>
             </div>
+
+            {/* Profile Update Confirmation */}
+            <ConfirmationModal
+                isOpen={showProfileConfirm}
+                onClose={() => setShowProfileConfirm(false)}
+                onConfirm={() => {
+                    handleUpdateProfile();
+                    setShowProfileConfirm(false);
+                }}
+                title="Update Profile"
+                message="Are you sure you want to update your profile information?"
+                confirmText="Save Changes"
+            />
+
+            {/* Password Update Confirmation */}
+            <ConfirmationModal
+                isOpen={showPasswordConfirm}
+                onClose={() => setShowPasswordConfirm(false)}
+                onConfirm={() => {
+                    handleUpdatePassword();
+                    setShowPasswordConfirm(false);
+                }}
+                title="Update Password"
+                message="Are you sure you want to change your password?"
+                confirmText="Update Password"
+            />
+
+            {/* Delete Account Confirmation */}
+            <ConfirmationModal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleDeleteAccount}
+                title="Delete Account"
+                confirmText="Delete Account"
+                isDanger={true}
+                disabled={userConfirmationInput !== confirmationText}
+            >
+                <div style={{ marginBottom: '1rem' }}>
+                    <p style={{ color: '#dc2626', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        This action cannot be undone.
+                    </p>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                        To confirm, please type <strong style={{ color: '#dc2626', fontFamily: 'monospace' }}>{confirmationText}</strong> below:
+                    </p>
+                    <input
+                        type="text"
+                        className="form-input"
+                        placeholder={`Type ${confirmationText} to confirm`}
+                        value={userConfirmationInput}
+                        onChange={(e) => {
+                            setUserConfirmationInput(e.target.value);
+                            setDeleteError("");
+                        }}
+                        style={{ fontFamily: 'monospace' }}
+                    />
+                    {deleteError && (
+                        <p style={{ color: '#dc2626', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                            {deleteError}
+                        </p>
+                    )}
+                </div>
+            </ConfirmationModal>
+
+            <ConfirmationModal
+                isOpen={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={() => {
+                    logout();
+                    setShowLogoutConfirm(false);
+                }}
+                title="Sign Out"
+                message="Are you sure you want to sign out of your account?"
+                confirmText="Sign Out"
+                isDanger={true}
+            />
+
+            {/* Profile Picture Delete Confirmation */}
+            <ConfirmationModal
+                isOpen={showDeletePicConfirm}
+                onClose={() => setShowDeletePicConfirm(false)}
+                onConfirm={async () => {
+                    try {
+                        await api.delete("/users/profile/picture");
+                        const updatedProfile = { ...profile!, profilePicture: "" };
+                        setProfile(updatedProfile);
+                        if (user) {
+                            updateUser({ ...user, profilePicture: "" });
+                        }
+                        setSuccess("Profile picture removed");
+                        setTimeout(() => setSuccess(""), 3000);
+                        setShowDeletePicConfirm(false);
+                    } catch (err) {
+                        setError("Failed to remove image");
+                        setShowDeletePicConfirm(false);
+                    }
+                }}
+                title="Remove Profile Picture"
+                message="Are you sure you want to remove your profile picture?"
+                confirmText="Remove"
+                isDanger={true}
+            />
         </div>
     );
 };

@@ -4,15 +4,13 @@ import api from "../../services/api";
 import Notification from "../../components/Notification";
 import GoBackButton from "../../components/GoBackButton";
 import { Clock, CheckCircle, ArrowRight, CreditCard } from "lucide-react";
+import useDocumentTitle from "../../hooks/useDocumentTitle";
 
-interface Order {
-    _id: string;
-    totalAmount: number;
-    status: string;
-    createdAt: string;
-}
+import type { Order } from "../../types";
+import Loading from "../../components/Loading";
 
 const MyOrders = () => {
+    useDocumentTitle("My Orders");
     const [orders, setOrders] = useState<Order[]>([]);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
@@ -32,12 +30,9 @@ const MyOrders = () => {
         }
     };
 
-    if (loading) return (
-        <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-            <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid #f3f3f3', borderTop: '3px solid #000', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-        </div>
-    );
+
+
+    if (loading) return <Loading />;
 
     return (
         <div className="orders-container">
@@ -48,9 +43,9 @@ const MyOrders = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
                 <div>
                     <h1 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, letterSpacing: '-1px' }}>My Orders</h1>
-                    <p style={{ color: 'var(--text-light)', marginTop: '0.5rem' }}>Track and manage your recent purchases</p>
+                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Track and manage your recent purchases</p>
                 </div>
-                <div style={{ background: 'var(--secondary)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: '600' }}>
+                <div style={{ background: 'var(--bg-primary)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: '600', border: '1px solid var(--border-color)' }}>
                     {orders.length} Orders
                 </div>
             </div>
@@ -58,12 +53,12 @@ const MyOrders = () => {
             <Notification message={error} type="error" />
 
             {orders.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "6rem 2rem", background: 'var(--secondary)', borderRadius: '16px' }}>
-                    <div style={{ marginBottom: '1.5rem', color: 'var(--text-light)' }}>
+                <div style={{ textAlign: "center", padding: "6rem 2rem", background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
                         <CreditCard size={48} strokeWidth={1} />
                     </div>
                     <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>No orders yet</h3>
-                    <p style={{ color: 'var(--text-light)', marginBottom: '2rem' }}>Looks like you haven't placed any orders yet.</p>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Looks like you haven't placed any orders yet.</p>
                     <Link to="/" className="btn">Start Shopping</Link>
                 </div>
             ) : (
@@ -94,7 +89,7 @@ const MyOrders = () => {
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Amount</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Amount</div>
                                     <div className="order-amount">${order.totalAmount.toFixed(2)}</div>
                                 </div>
 
@@ -104,7 +99,7 @@ const MyOrders = () => {
                                             Pay Now <ArrowRight size={16} />
                                         </Link>
                                     ) : (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                                             <CheckCircle size={16} color="#166534" />
                                             Payment Completed
                                         </div>
