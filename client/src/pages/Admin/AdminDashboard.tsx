@@ -2,6 +2,7 @@ import { useState } from "react";
 import api from "../../services/api";
 import Notification from "../../components/Notification";
 import useDocumentTitle from "../../hooks/useDocumentTitle";
+import Spinner from "../../components/Spinner";
 
 const AdminDashboard = () => {
     useDocumentTitle("Admin Dashboard");
@@ -16,9 +17,32 @@ const AdminDashboard = () => {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        const uploadData = new FormData();
+        uploadData.append("image", file);
+
+        try {
+            const res = await api.post("/upload", uploadData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            setFormData({ ...formData, image: res.data.url });
+            setSuccess("Image uploaded successfully");
+            setTimeout(() => setSuccess(""), 3000);
+        } catch (err: any) {
+            setError(err.response?.data?.message || "Failed to upload image");
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -152,24 +176,53 @@ const AdminDashboard = () => {
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", alignItems: "center", gap: "1rem" }}>
-                        <label style={{ color: "var(--text-secondary)", fontWeight: "500" }}>Image URL</label>
-                        <input
-                            type="url"
-                            name="image"
-                            value={formData.image}
-                            onChange={handleChange}
-                            required
-                            placeholder="https://example.com/image.jpg"
-                            style={{
-                                padding: "0.5rem",
-                                border: "1px solid var(--border-color)",
-                                borderRadius: "4px",
-                                width: "100%",
-                                maxWidth: "400px",
-                                background: "var(--bg-primary)",
-                                color: "var(--text-primary)"
-                            }}
-                        />
+                        <label style={{ color: "var(--text-secondary)", fontWeight: "500" }}>Image</label>
+                        <div style={{ width: "100%", maxWidth: "400px" }}>
+                            <div style={{ display: "flex", gap: "1rem", marginBottom: "0.5rem" }}>
+                                <input
+                                    type="text"
+                                    name="image"
+                                    value={formData.image}
+                                    onChange={handleChange}
+                                    required
+                                    placeholder="Enter Image URL or Upload"
+                                    style={{
+                                        padding: "0.5rem",
+                                        border: "1px solid var(--border-color)",
+                                        borderRadius: "4px",
+                                        flex: 1,
+                                        background: "var(--bg-primary)",
+                                        color: "var(--text-primary)"
+                                    }}
+                                />
+                                <input
+                                    type="file"
+                                    id="product-image-upload"
+                                    style={{ display: "none" }}
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                />
+                                <button
+                                    type="button"
+                                    className="btn-outline"
+                                    onClick={() => document.getElementById("product-image-upload")?.click()}
+                                    disabled={uploading}
+                                    style={{ whiteSpace: "nowrap", display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                >
+                                    {uploading ? <Spinner size="sm" color="dark" /> : "Upload"}
+                                </button>
+                            </div>
+                            {formData.image && (
+                                <div style={{ marginTop: "0.5rem", border: "1px solid var(--border-color)", padding: "0.5rem", borderRadius: "4px" }}>
+                                    <img
+                                        src={formData.image}
+                                        alt="Preview"
+                                        style={{ width: "100%", maxHeight: "200px", objectFit: "contain" }}
+                                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", alignItems: "center", gap: "1rem" }}>

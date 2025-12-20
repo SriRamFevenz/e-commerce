@@ -12,6 +12,8 @@ import { useNavigate } from "react-router-dom";
 
 import type { User } from "../../types";
 import Loading from "../../components/Loading";
+import ImageCropper from "../../components/ImageCropper";
+import Spinner from "../../components/Spinner";
 
 const Settings = () => {
     useDocumentTitle("Settings");
@@ -22,6 +24,9 @@ const Settings = () => {
     const [activeTab, setActiveTab] = useState('profile');
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [uploading, setUploading] = useState(false);
+    const [imageSrc, setImageSrc] = useState<string | null>(null);
+    const [showCropper, setShowCropper] = useState(false);
 
     // Profile Edit State
     const [newName, setNewName] = useState("");
@@ -154,31 +159,21 @@ const Settings = () => {
                                     id="avatar-upload"
                                     style={{ display: 'none' }}
                                     accept="image/*"
-                                    onChange={async (e) => {
+                                    onChange={(e) => {
                                         const file = e.target.files?.[0];
                                         if (!file) return;
 
-                                        const formData = new FormData();
-                                        formData.append('image', file);
-
-                                        try {
-                                            const res = await api.post("/users/profile/picture", formData, {
-                                                headers: { 'Content-Type': 'multipart/form-data' }
-                                            });
-                                            const updatedProfile = { ...profile!, profilePicture: res.data.profilePicture };
-                                            setProfile(updatedProfile);
-                                            if (user) {
-                                                updateUser({ ...user, profilePicture: res.data.profilePicture });
-                                            }
-                                            setSuccess("Profile picture updated");
-                                            setTimeout(() => setSuccess(""), 3000);
-                                        } catch (err) {
-                                            setError("Failed to upload image");
-                                        }
+                                        const reader = new FileReader();
+                                        reader.addEventListener("load", () => {
+                                            setImageSrc(reader.result as string);
+                                            setShowCropper(true);
+                                        });
+                                        reader.readAsDataURL(file);
+                                        e.target.value = ""; // Reset input
                                     }}
                                 />
-                                <button className="btn-black" onClick={() => document.getElementById('avatar-upload')?.click()}>
-                                    Change Photo
+                                <button className="btn-black" onClick={() => document.getElementById('avatar-upload')?.click()} disabled={uploading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {uploading ? <><Spinner size="sm" /> Uploading...</> : "Change Photo"}
                                 </button>
                                 <button
                                     className="btn-outline"
@@ -559,6 +554,36 @@ const Settings = () => {
                 confirmText="Remove"
                 isDanger={true}
             />
+
+            {showCropper && imageSrc && (
+                <ImageCropper
+                    imageSrc={imageSrc}
+                    onCancel={() => setShowCropper(false)}
+                    onCropComplete={async (croppedBlob) => {
+                        setShowCropper(false);
+                        setUploading(true);
+                        const formData = new FormData();
+                        formData.append('image', croppedBlob);
+
+                        try {
+                            const res = await api.post("/users/profile/picture", formData, {
+                                headers: { 'Content-Type': 'multipart/form-data' }
+                            });
+                            const updatedProfile = { ...profile!, profilePicture: res.data.profilePicture };
+                            setProfile(updatedProfile);
+                            if (user) {
+                                updateUser({ ...user, profilePicture: res.data.profilePicture });
+                            }
+                            setSuccess("Profile picture updated");
+                            setTimeout(() => setSuccess(""), 3000);
+                        } catch (err: any) {
+                            setError(err.response?.data?.error || "Failed to upload image");
+                        } finally {
+                            setUploading(false);
+                        }
+                    }}
+                />
+            )}
         </div>
     );
 };

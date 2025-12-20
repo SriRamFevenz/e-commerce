@@ -1,9 +1,7 @@
 const User = require("../models/User");
 const Order = require("../models/Order");
 const bcrypt = require("bcrypt");
-const fs = require("fs");
-const path = require("path");
-const sharp = require("sharp");
+const cloudinary = require("../config/cloudinary");
 
 exports.getProfile = async (req, res) => {
     try {
@@ -141,26 +139,19 @@ exports.uploadProfilePicture = async (req, res) => {
 
         // Delete old profile picture if it exists
         if (user.profilePicture) {
-            const oldFilename = user.profilePicture.split("/").pop();
-            const oldFilePath = path.join(__dirname, "../uploads", oldFilename);
-            if (fs.existsSync(oldFilePath)) {
-                fs.unlinkSync(oldFilePath);
+            try {
+                const regex = /\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/;
+                const match = user.profilePicture.match(regex);
+                if (match) {
+                    await cloudinary.uploader.destroy(match[1]);
+                }
+            } catch (err) {
+                console.error("Failed to delete old image from Cloudinary:", err);
             }
         }
 
-        // Construct the filename
-        const filename = `${Date.now()}-${req.file.originalname.split('.')[0]}.jpeg`;
-        const filePath = path.join(__dirname, "../uploads", filename);
-
-        // Compress and save the image
-        await sharp(req.file.buffer)
-            .resize(500, 500, { fit: 'cover' }) // Resize to 500x500
-            .toFormat('jpeg')
-            .jpeg({ quality: 80 }) // Compress to 80% quality
-            .toFile(filePath);
-
-        // Construct the file URL
-        const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
+        // Cloudinary returns the URL in req.file.path
+        const fileUrl = req.file.path;
 
         user.profilePicture = fileUrl;
         await user.save();
@@ -168,7 +159,7 @@ exports.uploadProfilePicture = async (req, res) => {
         res.json({ message: "Profile picture updated", profilePicture: fileUrl });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Internal server error", error: error.message });
     }
 };
 
@@ -179,12 +170,16 @@ exports.deleteProfilePicture = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Delete profile picture file if it exists
+        // Delete from Cloudinary
         if (user.profilePicture) {
-            const filename = user.profilePicture.split("/").pop();
-            const filePath = path.join(__dirname, "../uploads", filename);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            try {
+                const regex = /\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/;
+                const match = user.profilePicture.match(regex);
+                if (match) {
+                    await cloudinary.uploader.destroy(match[1]);
+                }
+            } catch (err) {
+                console.error("Failed to delete image from Cloudinary:", err);
             }
         }
 
@@ -194,7 +189,7 @@ exports.deleteProfilePicture = async (req, res) => {
         res.json({ message: "Profile picture deleted" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Internal server error", error: error.message });
     }
 };
 
