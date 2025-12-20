@@ -1,7 +1,10 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const User = require("../models/User");
 const { z } = require("zod");
+const crypto = require("crypto");
 const { paymentLogger } = require("../utils/logger");
+const { sendOrderConfirmationEmail, sendPaymentSuccessEmail } = require("../utils/emailService");
 
 const orderItemSchema = z.object({
     product: z.string(),
@@ -10,11 +13,12 @@ const orderItemSchema = z.object({
 
 const createOrderSchema = z.object({
     items: z.array(orderItemSchema).nonempty(),
+    paymentMethod: z.string(),
 });
 
 exports.createOrder = async (req, res) => {
     try {
-        const { items } = createOrderSchema.parse(req.body);
+        const { items, paymentMethod } = createOrderSchema.parse(req.body);
 
         let totalAmount = 0;
         const orderItems = [];
@@ -41,13 +45,38 @@ exports.createOrder = async (req, res) => {
             await product.save();
         }
 
+        // Generate payment token immediately
+        const token = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours validity for email link
+
         const order = await Order.create({
             user: req.user.id,
             items: orderItems,
             totalAmount,
+            paymentMethod,
+            paymentToken: token,
+            paymentTokenExpiresAt: expiresAt
         });
 
-        res.status(201).json(order);
+        // Generate Payment URL
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+        const paymentUrl = `${clientUrl}/pay/${token}`;
+
+        // Fetch user to get email
+        // Fetch user to get email
+        const user = await User.findById(req.user.id);
+        let emailSent = false;
+        if (user && user.email) {
+            const emailResult = await sendOrderConfirmationEmail(user.email, order, paymentUrl);
+            if (emailResult) {
+                console.log(`Order confirmation email sent to ${user.email}`);
+                emailSent = true;
+            } else {
+                console.error(`Failed to send order confirmation email to ${user.email}`);
+            }
+        }
+
+        res.status(201).json({ ...order.toObject(), emailSent });
     } catch (error) {
         if (error instanceof z.ZodError) {
             return res.status(400).json({ errors: error.errors });
@@ -67,7 +96,7 @@ exports.getMyOrders = async (req, res) => {
 
 const QRCode = require("qrcode");
 
-const crypto = require("crypto");
+
 
 exports.generateQRCode = async (req, res) => {
     try {
@@ -80,13 +109,19 @@ exports.generateQRCode = async (req, res) => {
             return res.status(403).json({ message: "Not authorized" });
         }
 
-        // Generate a secure random token
-        const token = crypto.randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        // Check if there's already a valid token
+        let token = order.paymentToken;
+        let expiresAt = order.paymentTokenExpiresAt;
 
-        order.paymentToken = token;
-        order.paymentTokenExpiresAt = expiresAt;
-        await order.save();
+        if (!token || !expiresAt || expiresAt < Date.now()) {
+            // Generate a secure random token only if needed
+            token = crypto.randomBytes(32).toString("hex");
+            expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours (consistent with createOrder)
+
+            order.paymentToken = token;
+            order.paymentTokenExpiresAt = expiresAt;
+            await order.save();
+        }
 
         // URL points to the CLIENT payment page with the token
         const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';

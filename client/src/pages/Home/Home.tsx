@@ -55,13 +55,23 @@ const Home = () => {
                 ) : (
                     <div className="product-grid">
                         {products.map((product) => (
-                            <div key={product._id} className="product-card">
+                            <div
+                                key={product._id}
+                                className="product-card"
+                                style={product.stock === 0 ? { filter: 'grayscale(100%)', opacity: 0.7 } : {}}
+                            >
                                 <img src={product.image} alt={product.title} />
                                 <h3>{product.title}</h3>
                                 <p>${product.price}</p>
-                                <Link to={`/product/${product._id}`} className="btn">
-                                    View Details
-                                </Link>
+                                {product.stock === 0 ? (
+                                    <button className="btn" disabled style={{ cursor: 'not-allowed', backgroundColor: '#ccc' }}>
+                                        Out of Stock
+                                    </button>
+                                ) : (
+                                    <Link to={`/product/${product._id}`} className="btn">
+                                        View Details
+                                    </Link>
+                                )}
                             </div>
                         ))}
                     </div>

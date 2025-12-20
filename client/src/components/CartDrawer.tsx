@@ -20,10 +20,14 @@ const CartDrawer = () => {
                 quantity: item.quantity,
             }));
 
-            const res = await api.post("/orders", { items: orderItems });
+            const res = await api.post("/orders", {
+                items: orderItems,
+                paymentMethod: "online"
+            });
 
             clearCart();
             toggleCart();
+
             navigate(`/order/${res.data._id}/qr`);
         } catch (error) {
             console.error("Checkout failed", error);
@@ -77,6 +81,8 @@ const CartDrawer = () => {
                         <span>Total</span>
                         <span>${cartTotal.toFixed(2)}</span>
                     </div>
+
+
                     <button
                         className="btn checkout-btn"
                         disabled={items.length === 0 || loading}

@@ -5,6 +5,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useWishlist } from "../context/WishlistContext";
 import CartDrawer from "./CartDrawer";
+import SupportWidget from "./SupportWidget";
 
 const Navbar = () => {
     const { items, toggleCart } = useCart();
@@ -252,7 +253,7 @@ const Footer = () => (
 
 const Layout = () => {
     const location = useLocation();
-    const hideFooterPaths = ['/orders', '/settings', '/login', '/register', '/checkout', '/cart', '/product', '/wishlist'];
+    const hideFooterPaths = ['/orders', '/settings', '/login', '/register', '/checkout', '/cart', '/product', '/wishlist', '/order'];
     const showFooter = !hideFooterPaths.some(path => location.pathname.startsWith(path));
 
     return (
@@ -263,6 +264,7 @@ const Layout = () => {
                 <Outlet />
             </main>
             {showFooter && <Footer />}
+            <SupportWidget />
         </div>
     );
 };

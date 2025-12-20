@@ -44,22 +44,35 @@ const QRView = () => {
     };
 
     return (
-        <div className="container" style={{ textAlign: "center" }}>
+        <div className="container" style={{ textAlign: "center", paddingBottom: "4rem" }}>
             <div style={{ textAlign: "left", marginTop: "2rem" }}>
                 <GoBackButton style={{ width: "auto", padding: "0.5rem 1rem", marginBottom: "1rem" }} />
             </div>
-            <h1>Scan to Pay</h1>
+            <h1>Payment</h1>
             <Notification message={error} type="error" />
+
+            <div style={{ backgroundColor: '#e3f2fd', padding: '1rem', borderRadius: '8px', margin: '1rem 0', border: '1px solid #90caf9' }}>
+                <p style={{ margin: 0, color: '#0d47a1' }}>
+                    📧 A payment link has also been sent to your email.
+                </p>
+            </div>
+
             {qrCode ? (
                 <div>
                     <img src={qrCode} alt="Payment QR" style={{ width: "300px" }} />
                     <p>Scan this QR code with your mobile device to pay.</p>
-                    {/* For testing purposes, show the link */}
-                    <p>
-                        <a href={scanUrl} target="_blank" rel="noreferrer">
-                            (Simulate Scan Link)
-                        </a>
-                    </p>
+
+                    <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+                        <p style={{ margin: 0, color: '#666' }}>Testing this on desktop?</p>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <a href={scanUrl} className="btn" style={{ textDecoration: 'none' }} target="_blank" rel="noopener noreferrer">
+                                Pay Now
+                            </a>
+                            <button onClick={() => navigate('/orders')} className="btn-outline">
+                                Pay Later
+                            </button>
+                        </div>
+                    </div>
                 </div>
             ) : (
                 <p>Loading QR...</p>
