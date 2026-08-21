@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -9,6 +10,7 @@ const path = require("path");
 const cookieParser = require("cookie-parser");
 
 const connectDB = require("./database/db");
+const { initSocket } = require("./utils/socket");
 const { apiLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -62,13 +64,18 @@ app.get("/", (req, res) => {
 app.use(errorHandler);
 
 const seedAdmin = require("./utils/seedAdmin");
+const seedProducts = require("./utils/seedProducts");
 
 connectDB().then(() => {
   seedAdmin();
+  seedProducts();
 });
 
+const server = http.createServer(app);
+initSocket(server);
+
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
 
