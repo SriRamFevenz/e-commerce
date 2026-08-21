@@ -1,19 +1,31 @@
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const smtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
+const transporter = smtpConfigured
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      // Port 465 requires implicit TLS; other ports use STARTTLS
+      secure: Number(process.env.SMTP_PORT) === 465,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+  : null;
+
+const getFromAddress = () => process.env.EMAIL_FROM || "Luma Store <no-reply@lumastore.local>";
 
 exports.sendOrderConfirmationEmail = async (to, order, paymentUrl) => {
+  if (!transporter) {
+    console.warn("SMTP not configured - skipping order confirmation email");
+    return null;
+  }
+
   try {
     const info = await transporter.sendMail({
-      from: `"Luma Store" <${process.env.EMAIL_FROM || "sriram_luma@protonmail.com"}>`,
+      from: getFromAddress(),
       to: to,
       subject: `Order Confirmation - #${order._id}`,
       html: `
@@ -21,7 +33,7 @@ exports.sendOrderConfirmationEmail = async (to, order, paymentUrl) => {
           <h2 style="color: #333;">Thank you for your order!</h2>
           <p>Hi there,</p>
           <p>Your order has been placed successfully. Please complete your payment to process the order.</p>
-          
+
           <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <p><strong>Order ID:</strong> ${order._id}</p>
             <p><strong>Total Amount:</strong> $${order.totalAmount.toFixed(2)}</p>
@@ -32,7 +44,7 @@ exports.sendOrderConfirmationEmail = async (to, order, paymentUrl) => {
           <div style="text-align: center; margin: 30px 0;">
             <a href="${paymentUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Pay Now</a>
           </div>
-          
+
           <p style="text-align: center; font-size: 12px; color: #666;">
             Or copy this link: <br>
             <a href="${paymentUrl}">${paymentUrl}</a>
@@ -42,7 +54,7 @@ exports.sendOrderConfirmationEmail = async (to, order, paymentUrl) => {
           <ul>
             ${order.items.map(item => `
               <li>
-                ${item.quantity}x Product ID: ${item.product} - $${item.price.toFixed(2)}
+                ${item.quantity}x ${item.product?.title || "Item"} - $${item.price.toFixed(2)}
               </li>
             `).join('')}
           </ul>
@@ -64,9 +76,14 @@ exports.sendOrderConfirmationEmail = async (to, order, paymentUrl) => {
 
 
 exports.sendPaymentSuccessEmail = async (to, order) => {
+  if (!transporter) {
+    console.warn("SMTP not configured - skipping payment success email");
+    return null;
+  }
+
   try {
     const info = await transporter.sendMail({
-      from: `"Luma Store" <${process.env.EMAIL_FROM || "sriram_luma@protonmail.com"}>`,
+      from: getFromAddress(),
       to: to,
       subject: `Payment Received - Order #${order._id}`,
       html: `
@@ -74,7 +91,7 @@ exports.sendPaymentSuccessEmail = async (to, order) => {
           <h2 style="color: #28a745;">Payment Successful!</h2>
           <p>Hi there,</p>
           <p>We have received your payment for Order #${order._id}.</p>
-          
+
           <div style="background-color: #f0fff4; padding: 15px; border-radius: 5px; margin: 20px 0; border: 1px solid #c3e6cb;">
             <p><strong>Amount Paid:</strong> $${order.totalAmount.toFixed(2)}</p>
             <p><strong>Transaction Date:</strong> ${new Date().toLocaleDateString()}</p>
@@ -82,7 +99,7 @@ exports.sendPaymentSuccessEmail = async (to, order) => {
           </div>
 
           <p>Your order is now being processed and will be shipped soon.</p>
-          
+
           <p>Thank you for shopping with us!</p>
           <p>Best regards,<br>Luma Store Team</p>
         </div>
