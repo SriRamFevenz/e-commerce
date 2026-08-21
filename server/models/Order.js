@@ -52,4 +52,7 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Token lookups happen on every public payment request - keep them indexed
+orderSchema.index({ paymentToken: 1 }, { unique: true, sparse: true });
+
 module.exports = mongoose.model("Order", orderSchema);
