@@ -1,6 +1,6 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
-const { generateToken } = require("../utils/jwt");
+const { generateToken, verifyToken } = require("../utils/jwt");
 const { z } = require("zod");
 const { logger, authLogger } = require("../utils/logger");
 
@@ -116,6 +116,41 @@ exports.login = async (req, res) => {
       return res.status(400).json({ errors: error.issues });
     }
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Session check for the client - always 200, with user: null when logged out,
+// so the app can probe auth state without generating console errors.
+exports.me = async (req, res) => {
+  try {
+    const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(" ")[1]);
+    if (!token) {
+      return res.json({ user: null });
+    }
+
+    const decoded = verifyToken(token);
+    const user = await User.findById(decoded.id);
+
+    if (!user || user.tokenVersion !== decoded.tokenVersion) {
+      return res.json({ user: null });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        mobile: user.mobile,
+        bio: user.bio,
+        address: user.address,
+        profilePicture: user.profilePicture,
+        themePreference: user.themePreference,
+        wishlist: user.wishlist,
+      },
+    });
+  } catch (error) {
+    res.json({ user: null });
   }
 };
 
