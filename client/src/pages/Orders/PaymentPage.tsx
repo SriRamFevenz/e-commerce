@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import axios from "axios";
 import api from "../../services/api";
 import Notification from "../../components/Notification";
 import { ShieldCheck, CreditCard, CheckCircle } from "lucide-react";
@@ -8,36 +9,54 @@ import useDocumentTitle from "../../hooks/useDocumentTitle";
 
 import Loading from "../../components/Loading";
 
+interface TokenOrder {
+    amount: number;
+    status: string;
+}
+
 const PaymentPage = () => {
     useDocumentTitle("Payment");
     const { token } = useParams();
-    const [order, setOrder] = useState<{ amount: number; status: string } | null>(null);
+    const [order, setOrder] = useState<TokenOrder | null>(null);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!token) return;
+        let cancelled = false;
+
+        const validateToken = async () => {
+            try {
+                const res = await api.get<TokenOrder>(`/orders/validate-token/${token}`);
+                if (!cancelled) setOrder(res.data);
+            } catch (err) {
+                const message = axios.isAxiosError(err)
+                    ? err.response?.data?.message || "Invalid or expired payment link"
+                    : "Invalid or expired payment link";
+                if (!cancelled) setError(message);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+
         validateToken();
+        return () => {
+            cancelled = true;
+        };
     }, [token]);
 
-    const validateToken = async () => {
-        try {
-            const res = await api.get(`/orders/validate-token/${token}`);
-            setOrder(res.data);
-        } catch (err: any) {
-            setError(err.response?.data?.message || "Invalid or expired payment link");
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handlePay = async () => {
+        if (!token) return;
         try {
             await api.post(`/orders/pay-token/${token}`);
             setSuccess("Payment Successful!");
             setOrder((prev) => prev ? { ...prev, status: "paid" } : null);
-        } catch (err: any) {
-            setError(err.response?.data?.message || "Payment Failed");
+        } catch (err) {
+            const message = axios.isAxiosError(err)
+                ? err.response?.data?.message || "Payment Failed"
+                : "Payment Failed";
+            setError(message);
         }
     };
 
@@ -90,10 +109,10 @@ const PaymentPage = () => {
                         {success ? <CheckCircle size={32} /> : <CreditCard size={32} />}
                     </div>
                     <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
-                        {success ? 'Payment Complete' : 'Secure Checkout'}
+                        {success ? 'Payment Complete' : 'Demo Checkout'}
                     </h1>
                     <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                        <ShieldCheck size={14} /> Encrypted & Secure
+                        <ShieldCheck size={14} /> Demo store - no real charge will be made
                     </p>
                 </div>
 
@@ -117,7 +136,7 @@ const PaymentPage = () => {
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
                                         <span>Payment Method</span>
-                                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Secure QR Link</span>
+                                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Demo QR Link</span>
                                     </div>
                                 </div>
 
