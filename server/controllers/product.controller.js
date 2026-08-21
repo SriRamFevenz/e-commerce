@@ -1,5 +1,6 @@
 const Product = require("../models/Product");
 const { z } = require("zod");
+const { emitProductsChanged } = require("../utils/socket");
 
 const productSchema = z.object({
     title: z.string().min(3).max(200),
@@ -17,6 +18,7 @@ exports.createProduct = async (req, res) => {
     try {
         const productData = productSchema.parse(req.body);
         const product = await Product.create(productData);
+        emitProductsChanged();
         res.status(201).json(product);
     } catch (error) {
         if (error instanceof z.ZodError) {
@@ -26,25 +28,41 @@ exports.createProduct = async (req, res) => {
     }
 };
 
+exports.getCategories = async (req, res) => {
+    try {
+        const categories = await Product.aggregate([
+            { $group: { _id: "$category", count: { $sum: 1 } } },
+            { $project: { _id: 0, name: "$_id", count: 1 } },
+            { $sort: { name: 1 } },
+        ]);
+        res.json(categories);
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
 exports.getAllProducts = async (req, res) => {
     try {
-        const { search, page, limit } = req.query;
+        const { search, category, page, limit } = req.query;
         let query = {};
 
         if (search) {
             const safeSearch = escapeRegex(String(search));
-            query = {
-                $or: [
-                    { title: { $regex: safeSearch, $options: "i" } },
-                    { description: { $regex: safeSearch, $options: "i" } },
-                    { tags: { $regex: safeSearch, $options: "i" } }
-                ]
-            };
+            query.$or = [
+                { title: { $regex: safeSearch, $options: "i" } },
+                { description: { $regex: safeSearch, $options: "i" } },
+                { tags: { $regex: safeSearch, $options: "i" } }
+            ];
+        }
+
+        if (category && category !== "all") {
+            query.category = { $regex: `^${escapeRegex(String(category))}$`, $options: "i" };
         }
 
         // Pagination is opt-in via query params; default keeps the full list
         const pageNum = Math.max(1, parseInt(page) || 1);
-        const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 0));
+        const parsedLimit = parseInt(limit);
+        const limitNum = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 0;
 
         let productsQuery = Product.find(query);
         if (limitNum > 0) {
@@ -77,6 +95,7 @@ exports.updateProduct = async (req, res) => {
         if (!product) {
             return res.status(404).json({ message: "Product not found" });
         }
+        emitProductsChanged();
         res.json(product);
     } catch (error) {
         if (error instanceof z.ZodError) {
@@ -92,6 +111,7 @@ exports.deleteProduct = async (req, res) => {
         if (!product) {
             return res.status(404).json({ message: "Product not found" });
         }
+        emitProductsChanged();
         res.json({ message: "Product deleted successfully" });
     } catch (error) {
         res.status(500).json({ message: "Internal server error" });
