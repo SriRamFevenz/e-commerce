@@ -5,6 +5,7 @@ const { z } = require("zod");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
 const { paymentLogger } = require("../utils/logger");
+const { emitProductsChanged } = require("../utils/socket");
 const { sendOrderConfirmationEmail, sendPaymentSuccessEmail } = require("../utils/emailService");
 
 const orderItemSchema = z.object({
@@ -83,6 +84,9 @@ exports.createOrder = async (req, res) => {
                 emailSent = true;
             }
         }
+
+        // Stock changed - push live update to all clients
+        emitProductsChanged();
 
         res.status(201).json({ ...order.toObject(), emailSent });
     } catch (error) {
