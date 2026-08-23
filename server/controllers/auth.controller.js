@@ -1,17 +1,18 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
-const { generateToken } = require("../utils/jwt");
+const { generateToken, verifyToken } = require("../utils/jwt");
 const { z } = require("zod");
+const { logger, authLogger } = require("../utils/logger");
 
 const registerSchema = z.object({
-  name: z.string().min(3),
-  email: z.string().email(),
-  password: z.string().min(6),
+  name: z.string().min(3).max(100).trim(),
+  email: z.string().email().toLowerCase().trim(),
+  password: z.string().min(6).max(72),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().email().toLowerCase().trim(),
+  password: z.string().min(1),
 });
 
 exports.register = async (req, res) => {
@@ -25,7 +26,7 @@ exports.register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    await User.create({
       name,
       email,
       password: hashedPassword,
@@ -34,7 +35,7 @@ exports.register = async (req, res) => {
     res.status(201).json({ message: "User created successfully" });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ errors: error.errors });
+      return res.status(400).json({ errors: error.issues });
     }
     res.status(500).json({ message: "Internal server error" });
   }
@@ -54,10 +55,26 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = generateToken({ id: user._id, role: user.role });
-    const { logger, authLogger } = require("../utils/logger");
+    // Check for Office IP restriction BEFORE treating the login as successful
+    if (user.role === 'admin' && process.env.OFFICE_IP && process.env.OFFICE_IP !== req.ip) {
+      authLogger.warn({
+        message: 'Admin Login Blocked - Invalid IP',
+        userId: user._id,
+        email: user.email,
+        ip: req.ip,
+        expectedIp: process.env.OFFICE_IP,
+        userAgent: req.headers['user-agent'],
+        timestamp: new Date().toISOString()
+      });
+      return res.status(403).json({ message: "Access denied: Invalid IP address" });
+    }
 
-    // Log all logins
+    const token = generateToken({
+      id: user._id,
+      role: user.role,
+      tokenVersion: user.tokenVersion
+    });
+
     authLogger.info({
       message: 'User Login',
       userId: user._id,
@@ -69,20 +86,6 @@ exports.login = async (req, res) => {
     });
 
     if (user.role === 'admin') {
-      // Check for Office IP restriction
-      if (process.env.OFFICE_IP && process.env.OFFICE_IP !== req.ip) {
-        logger.warn({
-          message: 'Admin Login Blocked - Invalid IP',
-          userId: user._id,
-          email: user.email,
-          ip: req.ip,
-          expectedIp: process.env.OFFICE_IP,
-          userAgent: req.headers['user-agent'],
-          timestamp: new Date().toISOString()
-        });
-        return res.status(403).json({ message: "Access denied: Invalid IP address" });
-      }
-
       logger.info({
         message: 'Admin Login',
         userId: user._id,
@@ -110,13 +113,52 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ errors: error.errors });
+      return res.status(400).json({ errors: error.issues });
     }
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// Session check for the client - always 200, with user: null when logged out,
+// so the app can probe auth state without generating console errors.
+exports.me = async (req, res) => {
+  try {
+    const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(" ")[1]);
+    if (!token) {
+      return res.json({ user: null });
+    }
+
+    const decoded = verifyToken(token);
+    const user = await User.findById(decoded.id);
+
+    if (!user || user.tokenVersion !== decoded.tokenVersion) {
+      return res.json({ user: null });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        mobile: user.mobile,
+        bio: user.bio,
+        address: user.address,
+        profilePicture: user.profilePicture,
+        themePreference: user.themePreference,
+        wishlist: user.wishlist,
+      },
+    });
+  } catch (error) {
+    res.json({ user: null });
+  }
+};
+
 exports.logout = (req, res) => {
-  res.clearCookie('token');
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
   res.json({ message: "Logged out successfully" });
 };

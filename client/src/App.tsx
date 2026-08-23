@@ -120,7 +120,14 @@ const App = () => {
                                     </Route>
 
                                     {/* Public Route for Scanning */}
-                                    <Route path="/api/orders/:id/scan" element={<ScanPage />} />
+                                    <Route
+                                        path="/scan/:id"
+                                        element={
+                                            <ProtectedRoute>
+                                                <ScanPage />
+                                            </ProtectedRoute>
+                                        }
+                                    />
                                     {/* Public Route for Secure Token Payment */}
                                     <Route path="/pay/:token" element={<PaymentPage />} />
 

@@ -23,11 +23,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const fetchProfile = async () => {
         try {
-            const res = await api.get("/users/profile");
-            setUser(res.data);
-        } catch (error) {
-            // console.error("Failed to fetch profile", error);
-            // Silent fail if not logged in
+            const res = await api.get("/auth/me");
+            setUser(res.data.user);
+        } catch {
+            // Network failure - treat as logged out
+            setUser(null);
         } finally {
             setLoading(false);
         }

@@ -6,6 +6,7 @@ const adminMiddleware = require("../middleware/admin");
 
 router.post("/", authMiddleware, adminMiddleware, productController.createProduct);
 router.get("/", productController.getAllProducts);
+router.get("/categories", productController.getCategories);
 router.get("/:id", productController.getProductById);
 router.put("/:id", authMiddleware, adminMiddleware, productController.updateProduct);
 router.delete("/:id", authMiddleware, adminMiddleware, productController.deleteProduct);

@@ -2,6 +2,8 @@ const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -11,6 +13,9 @@ const storage = new CloudinaryStorage({
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_FILE_SIZE, files: 1 },
+});
 
 module.exports = upload;
